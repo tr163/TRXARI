@@ -39,6 +39,9 @@ target_link_libraries(guide_replay PRIVATE guidecore)
 add_executable(cal_sim tools/cal_sim.cpp)
 target_link_libraries(cal_sim PRIVATE guidecore)
 
+add_executable(guide_live tools/guide_live.cpp)
+target_link_libraries(guide_live PRIVATE guidecore)
+
 enable_testing()
 add_test(NAME algorithms COMMAND test_algorithms)
 add_test(NAME star COMMAND test_star)

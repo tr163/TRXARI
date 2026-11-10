@@ -224,6 +224,13 @@ West/North 轴求解；10242 项检查通过，其中包含 PHD2 `TestTransforms
 导星算法和 1 ms 量化的脉冲输出，合成赤道仪按脉冲移动星点并保留 1 帧延迟。
 `python core/tools/make_replay_report.py` 同时展示残差、累计修正和脉冲毫秒。
 
+内核已封装成可交互形态：`python core/tools/guide_live_server.py` 起一个本地
+页面（`guide_live` 进程按行接收命令，Python 标准库 HTTP 服务转发）。页面上
+可以开始/暂停、切换算法、改 minMove/视宁度/漂移、扰动星点、重新校准、重置，
+实时看到星场、残差、脉冲与滚动 RMS。这层只是把已有 `GuideSession` +
+`CalibrationSession` 接上输入输出，没有新增算法逻辑，M1 之后可以原样换成
+相机帧源和 `:Mg` 脉冲输出。
+
 **下一步**
 1. **M1 相机门**：搭最小 APK 验证 ZWO SDK（不可跳过）
 2. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）→ NDK arm64 交叉编译

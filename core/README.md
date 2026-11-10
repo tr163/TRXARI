@@ -56,6 +56,19 @@ xAngle/yAngle/xRate/yRate；之后每帧渲染 121×121 星图（背景 + 噪声
 导星算法 → 有符号脉冲毫秒（1 ms 量化）→ 合成赤道仪（1 帧延迟）。页面显示残差、
 累计漂移 vs 实际修正、脉冲毫秒、SNR/HFD，以及 6 种算法的 RMS/脉冲汇总。
 
+交互式导星模拟（浏览器控制，不是静态报告）：
+
+```bash
+python core/tools/guide_live_server.py        # 打开 http://127.0.0.1:8765
+```
+
+后台常驻 `guide_live` 进程，一行命令进、一行 JSON 出（`step` / `algo:N` /
+`minmove:X` / `seeing:X` / `drift:X` / `dither` / `calibrate` / `reset`）。
+页面可以开始/暂停、切换 6 种算法、调 minMove / 视宁度 / 漂移速率、给星点加
+3 px 扰动、重新校准和重置；左侧是 121×121 实时星场（绿框为 15 px 搜索区），
+右侧是残差与脉冲曲线，指标为滚动 200 帧的 RMS/峰值。内核仍是同一套
+`GuideSession` + `CalibrationSession`，页面只发命令和画图。
+
 校准状态机验收页：
 
 ```bash
