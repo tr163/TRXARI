@@ -208,6 +208,120 @@ static void RenderStar(gc::usImage& img, double cx, double cy)
         }
 }
 
+struct SimMount
+{
+    double ratePxPerMs = 0.02;
+    double westAngle = 0.4;             // camera direction the star moves on a WEST pulse
+    double northAngle = 0.4 + PI / 2.0 - 0.05; // and on a NORTH pulse
+    gc::PHD_Point pos{ 100.0, 80.0 };
+
+    void pulse(gc::CalibrationDirection dir, int ms)
+    {
+        double angle = 0.0, sign = 1.0;
+        switch (dir)
+        {
+        case gc::CalibrationDirection::West: angle = westAngle; sign = 1.0; break;
+        case gc::CalibrationDirection::East: angle = westAngle; sign = -1.0; break;
+        case gc::CalibrationDirection::North: angle = northAngle; sign = 1.0; break;
+        case gc::CalibrationDirection::South: angle = northAngle; sign = -1.0; break;
+        case gc::CalibrationDirection::None: return;
+        }
+        pos.SetXY(pos.X + std::cos(angle) * ratePxPerMs * ms * sign,
+                  pos.Y + std::sin(angle) * ratePxPerMs * ms * sign);
+    }
+};
+
+static void testCalibrationStateMachine()
+{
+    SimMount mount;
+    const gc::PHD_Point start = mount.pos;
+
+    gc::CalibrationParams p;
+    gc::CalibrationSession session(p);
+    session.begin(start);
+
+    int guard = 0;
+    gc::CalibrationAction a;
+    bool sawWest = false, sawEast = false, sawNorth = false, sawSouth = false;
+    do
+    {
+        a = session.update(mount.pos);
+        if (a.complete || a.failed)
+            break;
+        CHECK(a.direction != gc::CalibrationDirection::None);
+        if (a.direction == gc::CalibrationDirection::West) sawWest = true;
+        if (a.direction == gc::CalibrationDirection::East) sawEast = true;
+        if (a.direction == gc::CalibrationDirection::North) sawNorth = true;
+        if (a.direction == gc::CalibrationDirection::South) sawSouth = true;
+        mount.pulse(a.direction, a.durationMs);
+    } while (++guard < 500);
+
+    CHECK(a.complete);
+    CHECK(!a.failed);
+    CHECK(session.isComplete());
+    CHECK(sawWest && sawEast && sawNorth && sawSouth);
+
+    const gc::Calibration& cal = session.calibration();
+    CHECK(cal.isValid);
+    CHECK_NEAR(cal.xAngle, normAngle(mount.westAngle + PI), 1e-9);
+    CHECK_NEAR(cal.yAngle, normAngle(mount.northAngle), 1e-9);
+    CHECK_NEAR(cal.xRate, mount.ratePxPerMs, 1e-9);
+    CHECK_NEAR(cal.yRate, mount.ratePxPerMs, 1e-9);
+    CHECK_NEAR(mount.pos.Distance(start), 0.0, 1.0); // recentered / nudged home
+
+    // the resulting calibration must drive the transforms
+    gc::MountTransform t;
+    t.setCalibration(cal);
+    gc::PHD_Point mountVec;
+    CHECK(t.cameraToMount(gc::PHD_Point(std::cos(mount.westAngle + PI) * 3.0,
+                                        std::sin(mount.westAngle + PI) * 3.0),
+                          mountVec));
+    CHECK_NEAR(mountVec.X, 3.0, 1e-6);
+}
+
+static void testCalibrationDecDisabled()
+{
+    SimMount mount;
+    gc::CalibrationParams p;
+    p.decGuideEnabled = false;
+    gc::CalibrationSession session(p);
+    session.begin(mount.pos);
+
+    int guard = 0;
+    gc::CalibrationAction a;
+    do
+    {
+        a = session.update(mount.pos);
+        if (a.complete || a.failed)
+            break;
+        mount.pulse(a.direction, a.durationMs);
+    } while (++guard < 500);
+
+    CHECK(a.complete);
+    const gc::Calibration& cal = session.calibration();
+    CHECK_NEAR(cal.xAngle, normAngle(mount.westAngle + PI), 1e-9);
+    CHECK_NEAR(cal.yRate, gc::kCalibrationRateUncalibrated, 1e-9);
+    CHECK_NEAR(cal.yAngle, normAngle(cal.xAngle + PI / 2.0), 1e-9);
+}
+
+static void testCalibrationStarDoesNotMove()
+{
+    SimMount mount;
+    gc::CalibrationSession session;
+    session.begin(mount.pos);
+
+    int guard = 0;
+    gc::CalibrationAction a;
+    do
+    {
+        a = session.update(mount.pos); // star never moves
+    } while (!a.failed && !a.complete && ++guard < 500);
+
+    CHECK(a.failed);
+    CHECK(a.error == gc::CalibrationError::RaStarDidNotMove);
+    CHECK(session.hasFailed());
+}
+
 // A 90-degree camera rotation must move the correction into the mount Y axis,
 // and the pulse width must come from the calibrated rate.
 static void testSessionUsesCalibration()
@@ -250,6 +364,9 @@ int main()
     testDeclinationCompensation();
     testFlip();
     testAxisSolvers();
+    testCalibrationStateMachine();
+    testCalibrationDecDisabled();
+    testCalibrationStarDoesNotMove();
     testSessionUsesCalibration();
 
     std::printf("%d checks, %d failures\n", g_checks, g_failures);

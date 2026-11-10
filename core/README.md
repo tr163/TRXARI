@@ -14,6 +14,7 @@ PHD2 v2.6.14 导星算法的最小 C++17 内核，纯算法、无 wx / 无 UI / 
 | 星点检测 / 质心 / AutoFind | `star.{h,cpp}` + `point.h`（PHD2 全局换成 `AutoFindParams`） |
 | 逐帧导星循环 | `guider_multistar.cpp` 的 `UpdateCurrentPosition()`（单星路径）→ `guide_session.{h,cpp}` |
 | 校准数学 / 坐标变换 / 脉冲 | `mount.cpp` 的 `SetCalibration`、两个 `Transform*`、`MoveOffset`；`scope.cpp` 的 West/North 轴计算 → `calibration.{h,cpp}` |
+| 校准状态机 | `scope.cpp` 的 `BeginCalibration` / `UpdateCalibrationState`（West→East→回差→North→South→Nudge）→ `CalibrationSession` |
 
 **注意**：PHD2 的 `SetMinMove` 等 setter 会写配置；这里去掉了持久化，
 只保留纯计算。`defaults(type)` 返回 PHD2 的默认参数。
@@ -27,8 +28,8 @@ ctest --test-dir core/build --output-on-failure
 ```
 
 Linux/NDK 下把 generator 换掉即可。测试覆盖：算法手算期望值、完美赤道仪闭环
-（40 项）、星点检测（20 项）、帧级导星循环（236 项）、校准数学（10242 项，
-含 PHD2 `TestTransforms()` 的全部角度组合）。
+（40 项）、星点检测（20 项）、帧级导星循环（236 项）、校准数学与状态机
+（10273 项，含 PHD2 `TestTransforms()` 的全部角度组合和一次完整四方向校准）。
 
 ## 可视化验收
 
@@ -54,6 +55,16 @@ python core/tools/make_replay_report.py
 把 `star - lockPos` 交给导星算法；赤道仪按 1 帧延迟应用修正。页面显示残差曲线、
 累计漂移 vs 累计修正、修正量、SNR/HFD，以及 6 种算法的 RMS 汇总。
 
+校准状态机验收页：
+
+```bash
+python core/tools/make_cal_report.py
+```
+
+`cal_sim` 用合成赤道仪驱动 `CalibrationSession`：星点按脉冲方向/毫秒移动，
+页面显示完整路径（West 测量 → East 回中 → 回差清除 → North 测量 → South 回中 →
+微调回起点）、每步方向/时长，以及算出的 xAngle/yAngle/xRate/yRate 与正交误差。
+
 星点检测另有验收页：
 
 ```bash
@@ -67,8 +78,7 @@ python core/tools/make_star_report.py
 
 ## 尚未移植
 
-- 交互式校准状态机（`Scope::UpdateCalibrationState` 的 East/South 回中、
-  回差清除、nudge、进度通知）；轴求解与坐标变换已完成
+- 校准的 RA/Dec parity（需要赤道仪 RA/Dec 回读）、进度/告警通知
 - 多星加权偏差（`RefineOffset`）与星等突变检查（`MassChecker`）
 - 导星脉冲/反转统计（算法用不到）
 - 高斯过程算法（可选，最后）

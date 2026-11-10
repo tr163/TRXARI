@@ -214,8 +214,13 @@ West/North 轴求解；10242 项检查通过，其中包含 PHD2 `TestTransforms
 全部正/反转角度组合。`GuideSession` 现在先做相机→赤道仪变换再把偏移送进算法，
 校准有效时同时给出有符号脉冲毫秒。
 
+校准状态机也已完成：`CalibrationSession` 按帧驱动，逐行移植
+`Scope::UpdateCalibrationState` 的 West 测量 → East 回中 → 回差清除 → North 测量
+→ South 回中 → nudge 回起点；合成赤道仪完整跑通并生成路径图
+（`python core/tools/make_cal_report.py`）。整包 10273 项检查通过。
+尚未移植的是 parity（需要 RA/Dec 回读）和通知/告警 UI。
+
 **下一步**
 1. **M1 相机门**：搭最小 APK 验证 ZWO SDK（不可跳过）
-2. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）→
-   交互式校准状态机（East/South 回中、回差清除）→ NDK arm64 交叉编译
+2. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）→ NDK arm64 交叉编译
 3. 两者都通过后再动 M2 及以后
