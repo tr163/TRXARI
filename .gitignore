@@ -1,0 +1,14 @@
+# 编译产物（45 MB，可用 pc-build/ 重建；建议放 GitHub Release）
+artifacts/*.tar.gz
+artifacts/*.zip
+
+# 会话原始记录（20 MB JSONL，仅本地存档）
+docs/session-recovery/*.jsonl
+
+# 调试残渣
+*.raw
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

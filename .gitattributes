@@ -1,0 +1,5 @@
+# 脚本要在 Linux/Android 上跑，强制 LF，别让 Windows 转成 CRLF
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.gz binary
