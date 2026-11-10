@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TR 导星模块 · 算法验证原型</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --line:#30363d; --fg:#c9d1d9; --dim:#8b949e;
+    --ra:#58a6ff; --dec:#ff7b72; --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+    --accent:#bc8cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif}
+  header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:12px;align-items:baseline}
+  header h1{font-size:16px;margin:0;font-weight:600}
+  header .sub{color:var(--dim);font-size:12px}
+  nav{display:flex;flex-wrap:wrap;gap:4px;padding:10px 14px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+  nav button{background:transparent;border:1px solid var(--line);color:var(--dim);padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px}
+  nav button.active{color:var(--fg);border-color:var(--accent);background:#1f2430}
+  main{padding:16px;max-width:1160px;margin:0 auto}
+  section.tab{display:none}
+  section.tab.active{display:block}
+  .row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;flex:1 1 300px;min-width:280px}
+  .panel h2{font-size:13px;margin:0 0 10px;color:var(--accent);font-weight:600;letter-spacing:.02em}
+  .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 12px}
+  label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--dim)}
+  input[type=number],select{background:#0d1117;border:1px solid var(--line);color:var(--fg);border-radius:5px;padding:5px 7px;font-size:13px;width:100%}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  button.act{background:#1f6feb;border:1px solid #388bfd;color:#fff;padding:7px 14px;border-radius:6px;cursor:pointer;font-size:13px}
+  button.act.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
+  button.act.stop{background:#7d2c26;border-color:#a04000}
+  canvas{width:100%;height:auto;background:#0a0e14;border:1px solid var(--line);border-radius:6px;display:block}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px}
+  .stat{background:#0d1117;border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+  .stat .k{font-size:11px;color:var(--dim)}
+  .stat .v{font-size:15px;font-variant-numeric:tabular-nums}
+  .note{color:var(--dim);font-size:12px;margin:10px 0 0;border-left:2px solid var(--line);padding-left:10px}
+  .badge{font-size:10px;padding:1px 6px;border-radius:10px;border:1px solid var(--line);color:var(--dim)}
+  .badge.ok{color:var(--ok);border-color:#238636}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--dim);margin:6px 0}
+  .legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:5px}
+  #selfOut{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre-wrap;background:#0a0e14;border:1px solid var(--line);border-radius:6px;padding:12px;min-height:120px}
+  .pass{color:var(--ok)} .fail{color:var(--bad)}
+  footer{color:var(--dim);font-size:11px;text-align:center;padding:18px}
+</style>
+</head>
+<body>
+<header>
+  <h1>TR 导星模块 · 算法验证原型</h1>
+  <span class="sub">数学逻辑移植自 PHD2 v2.6.14（BSD-3）· 相机/挂载/UI 为模拟</span>
+</header>
+
+<nav id="tabs">
+  <button class="active" data-tab="guide">导星曲线</button>
+  <button data-tab="staticpa">静态极轴</button>
+  <button data-tab="drift">漂移法</button>
+  <button data-tab="polardrift">漂移极轴</button>
+  <button data-tab="assistant">导星助手</button>
+  <button data-tab="selftest">自检</button>
+</nav>
+
+<main>
+
+<!-- ================= 导星曲线 ================= -->
+<section class="tab active" id="tab-guide">
+  <div class="row">
+    <div class="panel" style="flex:2 1 620px">
+      <h2>导星误差曲线 <span class="badge ok">模拟闭环</span></h2>
+      <div class="legend">
+        <span><i style="background:var(--ra)"></i>RA 误差</span>
+        <span><i style="background:var(--dec)"></i>Dec 误差</span>
+        <span><i style="background:#8b949e"></i>0 线</span>
+      </div>
+      <canvas id="guideCanvas" width="900" height="340"></canvas>
+      <div class="stats">
+        <div class="stat"><div class="k">RA RMS</div><div class="v" id="gRaRms">--</div></div>
+        <div class="stat"><div class="k">Dec RMS</div><div class="v" id="gDecRms">--</div></div>
+        <div class="stat"><div class="k">总 RMS</div><div class="v" id="gTotalRms">--</div></div>
+        <div class="stat"><div class="k">RA 漂移 (px/min)</div><div class="v" id="gRaDrift">--</div></div>
+        <div class="stat"><div class="k">RA 峰值</div><div class="v" id="gRaPeak">--</div></div>
+        <div class="stat"><div class="k">Dec 峰值</div><div class="v" id="gDecPeak">--</div></div>
+        <div class="stat"><div class="k">修正次数</div><div class="v" id="gPulses">--</div></div>
+      </div>
+      <p class="note">验证点：PHD2 的 Hysteresis（RA）与 Resist Switch（Dec）算法逐行移植；闭环中加入真实漂移、周期误差和视宁噪声，检查是否收敛、RMS 是否稳定、Resist Switch 是否拒绝反向过冲脉冲。</p>
+    </div>
+    <div class="panel">
+      <h2>参数</h2>
+      <div class="controls">
+        <label>RA 漂移 px/s<input type="number" id="gRaDriftIn" value="0.05" step="0.01"></label>
+        <label>Dec 漂移 px/s<input type="number" id="gDecDriftIn" value="0.02" step="0.01"></label>
+        <label>周期误差 px<input type="number" id="gPeAmp" value="0.4" step="0.1"></label>
+        <label>周期 s<input type="number" id="gPePeriod" value="480" step="10"></label>
+        <label>曝光 s<input type="number" id="gExp" value="2" step="0.5"></label>
+        <label>视宁噪声 px<input type="number" id="gSeeing" value="0.12" step="0.01"></label>
+        <label>min-move px<input type="number" id="gMinMove" value="0.2" step="0.05"></label>
+        <label>aggression<input type="number" id="gAggr" value="0.7" step="0.05"></label>
+        <label>hysteresis<input type="number" id="gHyst" value="0.1" step="0.05"></label>
+        <label>最大脉冲 px<input type="number" id="gMaxPulse" value="5" step="1"></label>
+        <label>挂载响应增益<input type="number" id="gGain" value="0.9" step="0.05"></label>
+      </div>
+      <div class="btns">
+        <button class="act" id="gStart">开始</button>
+        <button class="act ghost" id="gReset">重置</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 静态极轴 ================= -->
+<section class="tab" id="tab-staticpa">
+  <div class="row">
+    <div class="panel" style="flex:2 1 620px">
+      <h2>静态极轴（三点 / 两点旋转中心） <span class="badge">PHD2 staticpa</span></h2>
+      <canvas id="spaCanvas" width="900" height="620"></canvas>
+      <div class="stats">
+        <div class="stat"><div class="k">真值 CoR 偏移</div><div class="v" id="spaTruth">--</div></div>
+        <div class="stat"><div class="k">三点拟合偏移</div><div class="v" id="spaFit3">--</div></div>
+        <div class="stat"><div class="k">两点拟合偏移</div><div class="v" id="spaFit2">--</div></div>
+        <div class="stat"><div class="k">拟合半径 / 真值</div><div class="v" id="spaRadius">--</div></div>
+        <div class="stat"><div class="k">极轴误差 Alt</div><div class="v" id="spaAlt">--</div></div>
+        <div class="stat"><div class="k">极轴误差 Az</div><div class="v" id="spaAz">--</div></div>
+        <div class="stat"><div class="k">极轴误差 Total</div><div class="v" id="spaTotal">--</div></div>
+      </div>
+      <p class="note">验证点：三点圆拟合（PHD2 <code>CalcRotationCentre</code> 行列式法）与两点旋转角法（<code>fitCircle2</code>）都应还原同一旋转中心；Alt/Az 分解采用 <code>CalcAdjustments</code> 的投影公式。噪声设为 0 时误差应为 0。</p>
+    </div>
+    <div class="panel">
+      <h2>参数</h2>
+      <div class="controls">
+        <label>真值偏移 X px<input type="number" id="spaOffX" value="80" step="5"></label>
+        <label>真值偏移 Y px<input type="number" id="spaOffY" value="-45" step="5"></label>
+        <label>恒星轨道半径 px<input type="number" id="spaStarR" value="200" step="10"></label>
+        <label>每次旋转 °<input type="number" id="spaRot" value="120" step="5"></label>
+        <label>像素尺度 "/px<input type="number" id="spaScale" value="3.8" step="0.1"></label>
+        <label>相机角度 °<input type="number" id="spaCam" value="0" step="1"></label>
+        <label>时角 HA °<input type="number" id="spaHa" value="0" step="5"></label>
+        <label>半球<select id="spaHemi"><option value="1">北</option><option value="-1">南</option></select></label>
+        <label>测量噪声 px<input type="number" id="spaNoise" value="0.3" step="0.1"></label>
+      </div>
+      <div class="btns">
+        <button class="act" id="spaRun">生成并计算</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 漂移法 ================= -->
+<section class="tab" id="tab-drift">
+  <div class="row">
+    <div class="panel" style="flex:2 1 620px">
+      <h2>漂移法（Dec 趋势） <span class="badge">PHD2 drift_tool</span></h2>
+      <canvas id="driftCanvas" width="900" height="340"></canvas>
+      <div class="stats">
+        <div class="stat"><div class="k">Dec 漂移</div><div class="v" id="drRate">--</div></div>
+        <div class="stat"><div class="k">漂移角速度</div><div class="v" id="drArcmin">--</div></div>
+        <div class="stat"><div class="k">修正系数</div><div class="v" id="drCorr">--</div></div>
+        <div class="stat"><div class="k">拟合 RMS</div><div class="v" id="drFitRms">--</div></div>
+      </div>
+      <p class="note">验证点：对 Dec 位移做最小二乘拟合得到 px/min；方位角/高度角阶段的圆周修正系数取自 PHD2 <code>UpdateScopeCoordinates</code>（Frank Barrett 公式）。方位角阶段按 PHD2 的设计应在赤纬≈0 的恒星上做，否则系数退化为 1。趋势正负用于提示调整方向，原型只验证测量与系数。</p>
+    </div>
+    <div class="panel">
+      <h2>参数</h2>
+      <div class="controls">
+        <label>阶段<select id="drPhase"><option value="az">方位角（子午线）</option><option value="alt">高度角（地平附近）</option></select></label>
+        <label>赤纬 °<input type="number" id="drDec" value="0" step="1"></label>
+        <label>时角偏移 °<input type="number" id="drHa" value="0" step="5"></label>
+        <label>纬度 °<input type="number" id="drLat" value="31" step="1"></label>
+        <label>像素尺度 "/px<input type="number" id="drScale" value="3.8" step="0.1"></label>
+        <label>真实漂移 px/min<input type="number" id="drTrue" value="0.18" step="0.02"></label>
+        <label>采样数<input type="number" id="drN" value="20" step="1"></label>
+        <label>噪声 px<input type="number" id="drNoise" value="0.06" step="0.01"></label>
+      </div>
+      <div class="btns">
+        <button class="act" id="drRun">测量</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 漂移极轴 ================= -->
+<section class="tab" id="tab-polardrift">
+  <div class="row">
+    <div class="panel" style="flex:2 1 620px">
+      <h2>漂移极轴（星点漂移方向） <span class="badge">PHD2 polardrift</span></h2>
+      <canvas id="pdCanvas" width="900" height="480"></canvas>
+      <div class="stats">
+        <div class="stat"><div class="k">X 斜率 px/s</div><div class="v" id="pdVx">--</div></div>
+        <div class="stat"><div class="k">Y 斜率 px/s</div><div class="v" id="pdVy">--</div></div>
+        <div class="stat"><div class="k">极轴误差</div><div class="v" id="pdErr">--</div></div>
+        <div class="stat"><div class="k">角度</div><div class="v" id="pdAngle">--</div></div>
+      </div>
+      <p class="note">验证点：PHD2 <code>WatchDrift</code> 对 X/Y 分别做最小二乘，合成漂移矢量后乘 13751（秒/弧度）并指向天极；检查恢复的斜率与注入真值一致。</p>
+    </div>
+    <div class="panel">
+      <h2>参数</h2>
+      <div class="controls">
+        <label>真实 Vx px/s<input type="number" id="pdTrueVx" value="0.004" step="0.001"></label>
+        <label>真实 Vy px/s<input type="number" id="pdTrueVy" value="-0.002" step="0.001"></label>
+        <label>像素尺度 "/px<input type="number" id="pdScale" value="3.8" step="0.1"></label>
+        <label>采样数<input type="number" id="pdN" value="30" step="1"></label>
+        <label>噪声 px<input type="number" id="pdNoise" value="0.05" step="0.01"></label>
+        <label>半球<select id="pdHemi"><option value="1">北</option><option value="-1">南</option></select></label>
+        <label>镜像<select id="pdMirror"><option value="1">是</option><option value="-1">否</option></select></label>
+      </div>
+      <div class="btns">
+        <button class="act" id="pdRun">测量</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 导星助手 ================= -->
+<section class="tab" id="tab-assistant">
+  <div class="row">
+    <div class="panel" style="flex:2 1 620px">
+      <h2>导星助手 <span class="badge">PHD2 guiding_assistant</span></h2>
+      <canvas id="gaCanvas" width="900" height="340"></canvas>
+      <div class="stats">
+        <div class="stat"><div class="k">RA RMS</div><div class="v" id="gaRaRms">--</div></div>
+        <div class="stat"><div class="k">Dec RMS</div><div class="v" id="gaDecRms">--</div></div>
+        <div class="stat"><div class="k">总 RMS</div><div class="v" id="gaTotalRms">--</div></div>
+        <div class="stat"><div class="k">RA 峰值</div><div class="v" id="gaRaPeak">--</div></div>
+        <div class="stat"><div class="k">Dec 峰值</div><div class="v" id="gaDecPeak">--</div></div>
+        <div class="stat"><div class="k">Dec 漂移 px/min</div><div class="v" id="gaDrift">--</div></div>
+        <div class="stat"><div class="k">极轴误差</div><div class="v" id="gaPae">--</div></div>
+      </div>
+      <p class="note">验证点：用 Dec 位移的线性拟合斜率（px/min）代入 Barrett 公式 <code>PA = 3.8197 · |drift| · pxScale / cos(dec)</code>，结果单位角分；同时输出 RA/Dec RMS 与峰值。赤纬未知时按 dec=0 处理，结果应显示为下限。</p>
+    </div>
+    <div class="panel">
+      <h2>参数</h2>
+      <div class="controls">
+        <label>真实 Dec 漂移 px/min<input type="number" id="gaTrue" value="0.12" step="0.01"></label>
+        <label>赤纬 °<input type="number" id="gaDec" value="15" step="1"></label>
+        <label>像素尺度 "/px<input type="number" id="gaScale" value="3.8" step="0.1"></label>
+        <label>采样数<input type="number" id="gaN" value="60" step="5"></label>
+        <label>视宁噪声 px<input type="number" id="gaNoise" value="0.08" step="0.01"></label>
+        <label>RA 漂移 px/min<input type="number" id="gaRaDrift" value="0.03" step="0.01"></label>
+      </div>
+      <div class="btns">
+        <button class="act" id="gaRun">采样并分析</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 自检 ================= -->
+<section class="tab" id="tab-selftest">
+  <div class="row">
+    <div class="panel" style="flex:1 1 100%">
+      <h2>算法自检 <span class="badge">无噪声断言</span></h2>
+      <p class="note">在无噪声、已知输入下验证各数学函数能否精确还原真值。这是移植是否走样的最小证据。</p>
+      <div class="btns">
+        <button class="act" id="selfRun">运行自检</button>
+      </div>
+      <div id="selfOut" style="margin-top:12px">尚未运行。</div>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer>原型文件：TRXARI/prototype/guiding-prototype.html · PHD2 v2.6.14 算法参考 · 仅用于算法验证</footer>
+
+<script>
+/* ============================================================
+   通用数学
+   ============================================================ */
+const RAD = Math.PI / 180, DEG = 180 / Math.PI;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+function norm(a, lo, hi) { const r = hi - lo; return ((a - lo) % r + r) % r + lo; }
+function normAngle(a) { // PHD2 norm_angle: [-PI, PI)
+  a = (a + Math.PI) % (2 * Math.PI);
+  if (a < 0) a += 2 * Math.PI;
+  return a - Math.PI;
+}
+let _seed = 123456789;
+function seedRandom(s) { _seed = (s >>> 0) || 1; }
+function rnd() {
+  _seed ^= _seed << 13; _seed ^= _seed >>> 17; _seed ^= _seed << 5; _seed >>>= 0;
+  return _seed / 4294967296;
+}
+function gauss() {
+  let u = 0, v = 0;
+  while (u === 0) u = rnd();
+  while (v === 0) v = rnd();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+function std(a) {
+  if (a.length < 2) return 0;
+  const m = mean(a);
+  return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1));
+}
+function maxAbs(a) { return a.reduce((m, x) => Math.max(m, Math.abs(x)), 0); }
+function fitLine(xs, ys) {
+  const n = xs.length, mx = mean(xs), my = mean(ys);
+  let sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) { sxx += (xs[i] - mx) ** 2; sxy += (xs[i] - mx) * (ys[i] - my); }
+  const slope = sxx === 0 ? 0 : sxy / sxx;
+  const intercept = my - slope * mx;
+  let ss = 0;
+  for (let i = 0; i < n; i++) { const r = ys[i] - (slope * xs[i] + intercept); ss += r * r; }
+  return { slope, intercept, rms: Math.sqrt(ss / Math.max(1, n - 2)) };
+}
+
+/* ---------- 三点圆拟合（PHD2 CalcRotationCentre 行列式法） ---------- */
+function fitCircle3(p1, p2, p3) {
+  const a = p1.x * p1.x + p1.y * p1.y, b = p1.x, c = p1.y;
+  const e = p2.x * p2.x + p2.y * p2.y, f = p2.x, g = p2.y;
+  const i = p3.x * p3.x + p3.y * p3.y, j = p3.x, k = p3.y;
+  const m11 = b * g + c * j + f * k - g * j - c * f - b * k;
+  const m12 = a * g + c * i + e * k - g * i - c * e - a * k;
+  const m13 = a * f + b * i + e * j - f * i - b * e - a * j;
+  const m14 = a * f * k + b * g * i + c * e * j - c * f * i - b * e * k - a * g * j;
+  if (Math.abs(m11) < 1e-9) return null;
+  const cx = 0.5 * m12 / m11;
+  const cy = -0.5 * m13 / m11;
+  const cr = Math.sqrt(Math.max(0, cx * cx + cy * cy + m14 / m11));
+  return { cx, cy, r: cr };
+}
+
+/* ---------- 两点旋转中心（PHD2 auto 模式） ----------
+   raDiffDeg: 两次位置之间的 RA 变化（度，正= westward 的旋转量）
+   hemi: +1 北 / -1 南
+*/
+function fitCircle2(p1, p2, raDiffDeg, hemi) {
+  const radiff = normAngle((raDiffDeg * hemi) * RAD);
+  const theta2 = radiff / 2;
+  const lenchord = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+  const sin2 = Math.sin(theta2);
+  if (Math.abs(sin2) < 1e-6) return null;
+  const cr = Math.abs(lenchord / 2 / sin2);
+  const lenbase = Math.abs(cr * Math.cos(theta2));
+  const slopebase = Math.atan2(p1.y - p2.y, p2.x - p1.x) - hemi * Math.PI / 2;
+  const cx = (p1.x + p2.x) / 2 + lenbase * Math.cos(slopebase);
+  const cy = (p1.y + p2.y) / 2 - lenbase * Math.sin(slopebase);
+  return { cx, cy, r: cr };
+}
+
+/* ============================================================
+   PHD2 导星算法（逐行移植）
+   ============================================================ */
+class Hysteresis {
+  constructor({ minMove = 0.2, hysteresis = 0.1, aggression = 0.7 } = {}) {
+    this.minMove = minMove;
+    this.hysteresis = clamp(hysteresis, 0, 0.99);
+    this.aggression = clamp(aggression, 0, 2);
+    this.lastMove = 0;
+  }
+  reset() { this.lastMove = 0; }
+  result(input) {
+    let ret = (1 - this.hysteresis) * input + this.hysteresis * this.lastMove;
+    ret *= this.aggression;
+    if (Math.abs(input) < this.minMove) ret = 0;
+    this.lastMove = ret;
+    return ret;
+  }
+}
+
+class ResistSwitch {
+  static HISTORY_SIZE = 10;
+  constructor({ minMove = 0.2, aggression = 1.0, fastSwitch = true } = {}) {
+    this.minMove = minMove <= 0 ? 0.2 : minMove;
+    this.aggression = clamp(aggression, 0, 1);
+    this.fastSwitch = fastSwitch;
+    this.reset();
+  }
+  reset() {
+    this.history = Array(ResistSwitch.HISTORY_SIZE).fill(0);
+    this.currentSide = 0;
+  }
+  static sign(x) { return x > 0 ? 1 : x < 0 ? -1 : 0; }
+  result(input) {
+    let rslt = input;
+    this.history.push(input);
+    this.history.shift();
+    const sgn = ResistSwitch.sign(input);
+    try {
+      if (Math.abs(input) < this.minMove) throw 0;
+
+      if (this.fastSwitch) {
+        const thresh = 3 * this.minMove;
+        if (sgn !== this.currentSide && Math.abs(input) > thresh) {
+          this.currentSide = 0;
+          for (let i = 0; i < ResistSwitch.HISTORY_SIZE - 3; i++) this.history[i] = 0;
+          for (let i = ResistSwitch.HISTORY_SIZE - 3; i < ResistSwitch.HISTORY_SIZE; i++) this.history[i] = input;
+        }
+      }
+
+      let decHistory = 0;
+      for (const h of this.history) if (Math.abs(h) > this.minMove) decHistory += ResistSwitch.sign(h);
+
+      if (this.currentSide === 0 || ResistSwitch.sign(this.currentSide) === -ResistSwitch.sign(decHistory)) {
+        if (Math.abs(decHistory) < 3) throw 0;
+        let oldest = 0, newest = 0;
+        for (let i = 0; i < 3; i++) {
+          oldest += this.history[i];
+          newest += this.history[this.history.length - (i + 1)];
+        }
+        if (Math.abs(newest) <= Math.abs(oldest)) throw 0;
+        this.currentSide = ResistSwitch.sign(decHistory);
+      }
+      if (this.currentSide !== sgn) throw 0;
+    } catch (e) {
+      rslt = 0;
+    }
+    return rslt * this.aggression;
+  }
+}
+
+/* ============================================================
+   画布工具
+   ============================================================ */
+function ctxFor(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || canvas.width;
+  const h = Math.round(w * canvas.height / canvas.width);
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+function drawAxes(ctx, w, h, pad = 36) {
+  ctx.strokeStyle = '#30363d';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(pad, 8); ctx.lineTo(pad, h - pad);
+  ctx.moveTo(pad, h - pad); ctx.lineTo(w - 8, h - pad);
+  ctx.stroke();
+}
+function drawSeries(ctx, w, h, xs, ys, color, yScale, yMid, pad = 36, maxPoints = 400) {
+  const n = Math.min(xs.length, maxPoints);
+  const start = xs.length - n;
+  if (n < 2) return;
+  const x0 = xs[start], x1 = xs[xs.length - 1];
+  const spanX = Math.max(1e-9, x1 - x0);
+  const innerW = w - pad - 8;
+  const midY = (h - pad + 8) / 2;
+  const innerH = (h - pad - 8) / 2;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const idx = start + i;
+    const px = pad + (xs[idx] - x0) / spanX * innerW;
+    const py = midY - clamp(ys[idx] / yScale, -1, 1) * innerH;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+}
+function drawZero(ctx, w, h, pad = 36) {
+  const midY = (h - pad + 8) / 2;
+  ctx.strokeStyle = '#8b949e';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(pad, midY); ctx.lineTo(w - 8, midY); ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+/* ============================================================
+   Tab: 导星曲线
+   ============================================================ */
+const guide = {
+  running: false, timer: null, t: 0, ra: 0, dec: 0,
+  samples: [], raAlgo: null, decAlgo: null, cfg: null, pulses: 0,
+  reset() {
+    const c = this.cfg = {
+      raDrift: +$('gRaDriftIn').value,
+      decDrift: +$('gDecDriftIn').value,
+      peAmp: +$('gPeAmp').value,
+      pePeriod: +$('gPePeriod').value,
+      exp: +$('gExp').value,
+      seeing: +$('gSeeing').value,
+      minMove: +$('gMinMove').value,
+      aggr: +$('gAggr').value,
+      hyst: +$('gHyst').value,
+      maxPulse: +$('gMaxPulse').value,
+      gain: +$('gGain').value,
+    };
+    this.t = 0; this.ra = 0; this.dec = 0; this.samples = []; this.pulses = 0;
+    this.raAlgo = new Hysteresis({ minMove: c.minMove, hysteresis: c.hyst, aggression: c.aggr });
+    this.decAlgo = new ResistSwitch({ minMove: c.minMove, aggression: 1.0, fastSwitch: true });
+    this.render();
+  },
+  step() {
+    const c = this.cfg, dt = c.exp;
+    const w = 2 * Math.PI / c.pePeriod;
+    const peSlope = c.peAmp * w * Math.cos(w * this.t);
+    this.ra += (c.raDrift + peSlope) * dt;
+    this.dec += c.decDrift * dt;
+
+    const mra = this.ra + gauss() * c.seeing;
+    const mdec = this.dec + gauss() * c.seeing;
+
+    const cra = clamp(this.raAlgo.result(mra), -c.maxPulse, c.maxPulse);
+    const cdec = clamp(this.decAlgo.result(mdec), -c.maxPulse, c.maxPulse);
+    if (cra !== 0 || cdec !== 0) this.pulses++;
+
+    this.ra -= cra * c.gain;
+    this.dec -= cdec * c.gain;
+    this.t += dt;
+    this.samples.push({ t: this.t, ra: mra, dec: mdec });
+    if (this.samples.length > 1200) this.samples.splice(0, 200);
+    this.render();
+  },
+  render() {
+    const { ctx, w, h } = ctxFor($('guideCanvas'));
+    drawZero(ctx, w, h);
+    drawAxes(ctx, w, h);
+    const xs = this.samples.map(s => s.t);
+    const ra = this.samples.map(s => s.ra);
+    const dec = this.samples.map(s => s.dec);
+    const vis = 400; // 只按可见窗口定纵向比例，避免起始瞬态把图压扁
+    const yScale = Math.max(1, maxAbs(ra.slice(-vis)), maxAbs(dec.slice(-vis))) * 1.15;
+    drawSeries(ctx, w, h, xs, ra, '#58a6ff', yScale, 0);
+    drawSeries(ctx, w, h, xs, dec, '#ff7b72', yScale, 0);
+    ctx.fillStyle = '#8b949e'; ctx.font = '11px ui-monospace,monospace';
+    ctx.fillText(`±${yScale.toFixed(2)} px`, 6, 14);
+
+    if (this.samples.length > 3) {
+      const rms = arr => std(arr);
+      const raRms = rms(ra), decRms = rms(dec);
+      const drift = fitLine(xs, ra).slope * 60;
+      $('gRaRms').textContent = raRms.toFixed(3) + ' px';
+      $('gDecRms').textContent = decRms.toFixed(3) + ' px';
+      $('gTotalRms').textContent = Math.hypot(raRms, decRms).toFixed(3) + ' px';
+      $('gRaDrift').textContent = drift.toFixed(3);
+      $('gRaPeak').textContent = maxAbs(ra).toFixed(2) + ' px';
+      $('gDecPeak').textContent = maxAbs(dec).toFixed(2) + ' px';
+      $('gPulses').textContent = this.pulses;
+    }
+  },
+  start() {
+    if (this.running) { this.stop(); return; }
+    this.reset();
+    this.running = true;
+    $('gStart').textContent = '停止';
+    $('gStart').classList.add('stop');
+    this.timer = setInterval(() => this.step(), 120);
+  },
+  stop() {
+    this.running = false;
+    clearInterval(this.timer);
+    $('gStart').textContent = '开始';
+    $('gStart').classList.remove('stop');
+  },
+};
+
+/* ============================================================
+   Tab: 静态极轴
+   ============================================================ */
+const SPA_W = 900, SPA_H = 620;
+const spa = {
+  run() {
+    const W = SPA_W, H = SPA_H;
+    const offx = +$('spaOffX').value, offy = +$('spaOffY').value;
+    const r = +$('spaStarR').value, rot = +$('spaRot').value;
+    const pxScale = +$('spaScale').value, camAngle = +$('spaCam').value;
+    const ha = +$('spaHa').value, hemi = +$('spaHemi').value;
+    const noise = +$('spaNoise').value;
+    seedRandom(20261111);
+
+    const cor = { x: W / 2 + offx, y: H / 2 + offy };
+    const phi = -70 * RAD;
+    const pts = [0, 1, 2].map(i => {
+      const th = hemi * i * rot * RAD;
+      return {
+        x: cor.x + r * Math.cos(phi + th) + (noise ? gauss() * noise : 0),
+        y: cor.y + r * Math.sin(phi + th) + (noise ? gauss() * noise : 0),
+      };
+    });
+
+    const f3 = fitCircle3(pts[0], pts[1], pts[2]);
+    const f2 = fitCircle2(pts[0], pts[1], rot, hemi);
+
+    const fmtOff = f => f ? `(${(f.cx - W / 2).toFixed(1)}, ${(f.cy - H / 2).toFixed(1)})` : '失败';
+    $('spaTruth').textContent = `(${offx.toFixed(0)}, ${offy.toFixed(0)}) px`;
+    $('spaFit3').textContent = fmtOff(f3);
+    $('spaFit2').textContent = fmtOff(f2);
+    $('spaRadius').textContent = f3 ? `${f3.r.toFixed(1)} / ${r.toFixed(0)} px` : '--';
+
+    if (f3) {
+      // PHD2 CalcAdjustments 投影：CoR 相对传感器中心的偏移
+      const dx = f3.cx - W / 2, dy = f3.cy - H / 2;
+      const hcorR = Math.hypot(dx, dy);
+      const hcorA = Math.atan2(dy, dx) * DEG;
+      const rarot = -camAngle;
+      const harot = norm(rarot - (90 + ha), 0, 360);
+      const hrot = norm(hcorA - harot, 0, 360);
+      const azR = hcorR * Math.sin(hrot * RAD);
+      const altR = hcorR * Math.cos(hrot * RAD);
+      $('spaAlt').textContent = (Math.abs(altR) * pxScale / 60).toFixed(1) + "'";
+      $('spaAz').textContent = (Math.abs(azR) * pxScale / 60).toFixed(1) + "'";
+      $('spaTotal').textContent = (hcorR * pxScale / 60).toFixed(1) + "'";
+    }
+
+    // 绘制
+    const { ctx, w, h } = ctxFor($('spaCanvas'));
+    const sx = w / W, sy = h / H;
+    ctx.save(); ctx.scale(sx, sy);
+
+    ctx.strokeStyle = '#21262d'; ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 100) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 100) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+    // 传感器中心
+    ctx.strokeStyle = '#8b949e'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 12, H / 2); ctx.lineTo(W / 2 + 12, H / 2);
+    ctx.moveTo(W / 2, H / 2 - 12); ctx.lineTo(W / 2, H / 2 + 12);
+    ctx.stroke();
+
+    // 真值 CoR
+    ctx.strokeStyle = '#f85149'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cor.x - 14, cor.y); ctx.lineTo(cor.x + 14, cor.y);
+    ctx.moveTo(cor.x, cor.y - 14); ctx.lineTo(cor.x, cor.y + 14);
+    ctx.stroke();
+
+    // 拟合圆
+    if (f3) {
+      ctx.strokeStyle = '#bc8cff'; ctx.setLineDash([4, 5]);
+      ctx.beginPath(); ctx.arc(f3.cx, f3.cy, f3.r, 0, 2 * Math.PI); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#bc8cff';
+      ctx.beginPath(); ctx.arc(f3.cx, f3.cy, 2.5, 0, 2 * Math.PI); ctx.fill();
+    }
+
+    // 三个点
+    const labels = ['A', 'B', 'C'];
+    pts.forEach((p, i) => {
+      ctx.fillStyle = '#3fb950';
+      ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI); ctx.fill();
+      ctx.fillStyle = '#c9d1d9'; ctx.font = '13px sans-serif';
+      ctx.fillText(labels[i], p.x + 9, p.y - 8);
+    });
+
+    ctx.fillStyle = '#8b949e'; ctx.font = '11px ui-monospace,monospace';
+    ctx.fillText('灰十字 = 传感器中心', 14, 20);
+    ctx.fillStyle = '#f85149'; ctx.fillText('红十字 = 真实旋转中心 (CoR)', 14, 36);
+    ctx.fillStyle = '#bc8cff'; ctx.fillText('紫圆 = 三点拟合', 14, 52);
+    ctx.restore();
+  },
+};
+
+/* ============================================================
+   Tab: 漂移法
+   ============================================================ */
+const drift = {
+  run() {
+    const phase = $('drPhase').value;
+    const dec = +$('drDec').value, ha = +$('drHa').value, lat = +$('drLat').value;
+    const scale = +$('drScale').value, trueRate = +$('drTrue').value;
+    const n = Math.max(3, +$('drN').value), noise = +$('drNoise').value;
+    seedRandom(424242);
+
+    const ts = [], ys = [];
+    for (let i = 0; i < n; i++) {
+      const t = i * 1.0; // 分钟
+      ts.push(t);
+      ys.push(trueRate * t + (noise ? gauss() * noise : 0));
+    }
+    const fit = fitLine(ts, ys);
+    const rate = fit.slope;
+
+    // PHD2 UpdateScopeCoordinates 修正系数
+    let correction = 1;
+    if (phase === 'az') {
+      const decR = dec * RAD;
+      if (Math.abs(decR) < 0.001) {
+        const altR = RAD * (90 - lat + dec);
+        correction = Math.cos(altR) / Math.cos(decR);
+      }
+    } else {
+      const haR = ha * RAD;
+      const cosDec = Math.cos(dec * RAD);
+      const cosHa = Math.cos(haR);
+      correction = Math.sqrt(1 + cosDec * cosDec * (cosHa * cosHa - 1));
+      if (Math.abs(ha) > 15) correction /= Math.abs(Math.sin(haR));
+      else correction = 1;
+    }
+
+    $('drRate').textContent = rate.toFixed(3) + ' px/min';
+    $('drArcmin').textContent = (rate * scale).toFixed(2) + " '/min";
+    $('drCorr').textContent = correction.toFixed(3);
+    $('drFitRms').textContent = fit.rms.toFixed(3) + ' px';
+
+    const { ctx, w, h } = ctxFor($('driftCanvas'));
+    drawZero(ctx, w, h);
+    drawAxes(ctx, w, h);
+    const yScale = Math.max(0.3, maxAbs(ys)) * 1.2;
+    drawSeries(ctx, w, h, ts, ys, '#ff7b72', yScale, 0);
+    // 拟合线
+    ctx.strokeStyle = '#58a6ff'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    const midY = (h - 36 + 8) / 2, innerH = (h - 36 - 8) / 2;
+    const x0 = ts[0], x1 = ts[ts.length - 1];
+    const px0 = 36, px1 = w - 8;
+    const py0 = midY - clamp((fit.intercept) / yScale, -1, 1) * innerH;
+    const py1 = midY - clamp((fit.slope * x1 + fit.intercept) / yScale, -1, 1) * innerH;
+    ctx.moveTo(px0, py0); ctx.lineTo(px1, py1); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#8b949e'; ctx.font = '11px ui-monospace,monospace';
+    ctx.fillText(`斜率 ${rate.toFixed(3)} px/min · ±${yScale.toFixed(2)} px`, 6, 14);
+  },
+};
+
+/* ============================================================
+   Tab: 漂移极轴
+   ============================================================ */
+const polardrift = {
+  run() {
+    const vx = +$('pdTrueVx').value, vy = +$('pdTrueVy').value;
+    const scale = +$('pdScale').value, n = Math.max(3, +$('pdN').value);
+    const noise = +$('pdNoise').value, hemi = +$('pdHemi').value, mirror = +$('pdMirror').value;
+    seedRandom(777001);
+
+    const ts = [], xs = [], ys = [];
+    const x0 = 100, y0 = 80;
+    for (let i = 0; i < n; i++) {
+      const t = i * 1.0; // 秒
+      ts.push(t);
+      xs.push(x0 + vx * t + (noise ? gauss() * noise : 0));
+      ys.push(y0 + vy * t + (noise ? gauss() * noise : 0));
+    }
+    const fx = fitLine(ts, xs), fy = fitLine(ts, ys);
+
+    const FACTOR = 24 * 3600 / 2 / Math.PI; // ≈13751 秒/弧度
+    const theta = Math.atan2(fy.slope, fx.slope) * DEG;
+    const alpha = theta + hemi * 90 * mirror;
+    const offset = Math.hypot(fx.slope, fy.slope) * FACTOR;
+    const cur = { x: xs[xs.length - 1], y: ys[ys.length - 1] };
+    const target = {
+      x: cur.x + offset * Math.cos(alpha * RAD),
+      y: cur.y + offset * Math.sin(alpha * RAD),
+    };
+    const paErr = offset * scale / 60;
+
+    $('pdVx').textContent = fx.slope.toFixed(4);
+    $('pdVy').textContent = fy.slope.toFixed(4);
+    $('pdErr').textContent = paErr.toFixed(2) + "'";
+    $('pdAngle').textContent = norm(-alpha, -180, 180).toFixed(1) + '°';
+
+    const { ctx, w, h } = ctxFor($('pdCanvas'));
+    const pad = 40;
+    const allX = xs.concat([target.x]), allY = ys.concat([target.y]);
+    const minX = Math.min(...allX), maxX = Math.max(...allX);
+    const minY = Math.min(...allY), maxY = Math.max(...allY);
+    const spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
+    const s = Math.min((w - pad * 2) / spanX, (h - pad * 2) / spanY);
+    const tx = x => pad + (x - minX) * s;
+    const ty = y => h - pad - (y - minY) * s;
+
+    ctx.strokeStyle = '#21262d';
+    for (let gx = Math.floor(minX / 50) * 50; gx <= maxX; gx += 50) {
+      ctx.beginPath(); ctx.moveTo(tx(gx), pad); ctx.lineTo(tx(gx), h - pad); ctx.stroke();
+    }
+    for (let gy = Math.floor(minY / 50) * 50; gy <= maxY; gy += 50) {
+      ctx.beginPath(); ctx.moveTo(pad, ty(gy)); ctx.lineTo(w - pad, ty(gy)); ctx.stroke();
+    }
+
+    ctx.fillStyle = '#58a6ff';
+    for (let i = 0; i < xs.length; i++) {
+      ctx.beginPath(); ctx.arc(tx(xs[i]), ty(ys[i]), 2.5, 0, 2 * Math.PI); ctx.fill();
+    }
+    // 当前点
+    ctx.fillStyle = '#3fb950';
+    ctx.beginPath(); ctx.arc(tx(cur.x), ty(cur.y), 5, 0, 2 * Math.PI); ctx.fill();
+    // 目标点
+    ctx.strokeStyle = '#f85149'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(tx(target.x) - 8, ty(target.y)); ctx.lineTo(tx(target.x) + 8, ty(target.y));
+    ctx.moveTo(tx(target.x), ty(target.y) - 8); ctx.lineTo(tx(target.x), ty(target.y) + 8);
+    ctx.stroke();
+    ctx.strokeStyle = '#d29922'; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(tx(cur.x), ty(cur.y)); ctx.lineTo(tx(target.x), ty(target.y)); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#8b949e'; ctx.font = '11px ui-monospace,monospace';
+    ctx.fillText('蓝点 = 漂移采样 · 绿点 = 当前 · 红十字 = 天极方向目标', pad, 16);
+  },
+};
+
+/* ============================================================
+   Tab: 导星助手
+   ============================================================ */
+const assistant = {
+  run() {
+    const rate = +$('gaTrue').value, dec = +$('gaDec').value;
+    const scale = +$('gaScale').value, n = Math.max(5, +$('gaN').value);
+    const noise = +$('gaNoise').value, raDrift = +$('gaRaDrift').value;
+    seedRandom(99001);
+
+    const ts = [], ras = [], decs = [];
+    for (let i = 0; i < n; i++) {
+      const t = i * 2 / 60; // 2s 曝光 → 分钟
+      ts.push(t);
+      ras.push(raDrift * t + (noise ? gauss() * noise : 0));
+      decs.push(rate * t + (noise ? gauss() * noise : 0));
+    }
+    const fd = fitLine(ts, decs);
+    const driftPerMin = fd.slope;
+    const cosdec = Math.cos(dec * RAD);
+    // Barrett / PHD2 guiding_assistant.cpp:1957
+    const pae = 3.8197 * Math.abs(driftPerMin) * scale / cosdec;
+
+    const raRms = std(ras), decRms = std(decs);
+    $('gaRaRms').textContent = raRms.toFixed(3) + ' px';
+    $('gaDecRms').textContent = decRms.toFixed(3) + ' px';
+    $('gaTotalRms').textContent = Math.hypot(raRms, decRms).toFixed(3) + ' px';
+    $('gaRaPeak').textContent = maxAbs(ras).toFixed(3) + ' px';
+    $('gaDecPeak').textContent = maxAbs(decs).toFixed(3) + ' px';
+    $('gaDrift').textContent = driftPerMin.toFixed(4);
+    $('gaPae').textContent = pae.toFixed(1) + "'";
+
+    const { ctx, w, h } = ctxFor($('gaCanvas'));
+    drawZero(ctx, w, h);
+    drawAxes(ctx, w, h);
+    const yScale = Math.max(0.2, maxAbs(decs), maxAbs(ras)) * 1.2;
+    drawSeries(ctx, w, h, ts, ras, '#58a6ff', yScale, 0);
+    drawSeries(ctx, w, h, ts, decs, '#ff7b72', yScale, 0);
+    // Dec 拟合线
+    ctx.strokeStyle = '#d29922'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.2;
+    const midY = (h - 36 + 8) / 2, innerH = (h - 36 - 8) / 2;
+    ctx.beginPath();
+    ctx.moveTo(36, midY - clamp(fd.intercept / yScale, -1, 1) * innerH);
+    ctx.lineTo(w - 8, midY - clamp((fd.slope * ts[ts.length - 1] + fd.intercept) / yScale, -1, 1) * innerH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#8b949e'; ctx.font = '11px ui-monospace,monospace';
+    ctx.fillText(`Dec 拟合 ${driftPerMin.toFixed(4)} px/min · ±${yScale.toFixed(2)} px`, 6, 14);
+  },
+};
+
+/* ============================================================
+   自检
+   ============================================================ */
+function runSelfTest() {
+  const out = [];
+  let pass = 0, fail = 0;
+  const ok = (name, cond, detail = '') => {
+    if (cond) { pass++; out.push(`<span class="pass">PASS</span> ${name}${detail ? '  ' + detail : ''}`); }
+    else { fail++; out.push(`<span class="fail">FAIL</span> ${name}${detail ? '  ' + detail : ''}`); }
+  };
+  const near = (a, b, tol) => Math.abs(a - b) <= tol;
+
+  // 1. 三点圆拟合
+  {
+    const cx = 517.25, cy = 233.75, r = 187.5;
+    const pts = [0, 120, 240].map(a => ({ x: cx + r * Math.cos(a * RAD), y: cy + r * Math.sin(a * RAD) }));
+    const f = fitCircle3(pts[0], pts[1], pts[2]);
+    ok('三点圆拟合中心', f && near(f.cx, cx, 1e-6) && near(f.cy, cy, 1e-6),
+      f ? `cx=${f.cx.toFixed(6)} cy=${f.cy.toFixed(6)}` : 'null');
+    ok('三点圆拟合半径', f && near(f.r, r, 1e-6), f ? `r=${f.r.toFixed(6)}` : 'null');
+  }
+
+  // 2. 两点旋转中心（北半球）
+  {
+    const cx = 450, cy = 310, r = 200, rot = 120;
+    const pts = [0, rot].map(a => ({ x: cx + r * Math.cos(a * RAD), y: cy + r * Math.sin(a * RAD) }));
+    const f = fitCircle2(pts[0], pts[1], rot, 1);
+    ok('两点旋转中心 (N)', f && near(f.cx, cx, 1e-6) && near(f.cy, cy, 1e-6),
+      f ? `cx=${f.cx.toFixed(6)} cy=${f.cy.toFixed(6)}` : 'null');
+  }
+  // 南半球
+  {
+    const cx = 450, cy = 310, r = 200, rot = 120;
+    const pts = [0, -rot].map(a => ({ x: cx + r * Math.cos(a * RAD), y: cy + r * Math.sin(a * RAD) }));
+    const f = fitCircle2(pts[0], pts[1], rot, -1);
+    ok('两点旋转中心 (S)', f && near(f.cx, cx, 1e-6) && near(f.cy, cy, 1e-6),
+      f ? `cx=${f.cx.toFixed(6)} cy=${f.cy.toFixed(6)}` : 'null');
+  }
+
+  // 3. Hysteresis 阶跃响应
+  {
+    const h = new Hysteresis({ minMove: 0.2, hysteresis: 0.1, aggression: 0.7 });
+    const r1 = h.result(1.0); // 0.7*(0.9*1+0.1*0)=0.63
+    const r2 = h.result(1.0); // 0.7*(0.9*1+0.1*0.63)=0.6741
+    ok('Hysteresis 阶跃 1', near(r1, 0.63, 1e-12), `r1=${r1.toFixed(6)}`);
+    ok('Hysteresis 阶跃 2', near(r2, 0.6741, 1e-12), `r2=${r2.toFixed(6)}`);
+    const h2 = new Hysteresis({ minMove: 0.5, hysteresis: 0.1, aggression: 0.7 });
+    ok('Hysteresis min-move 抑制', h2.result(0.3) === 0, 'input 0.3 < 0.5');
+  }
+
+  // 4. Resist Switch：低于 min-move 返回 0；持续同向最终出脉冲；反向大跳应被否决
+  {
+    const rs = new ResistSwitch({ minMove: 0.2, aggression: 1, fastSwitch: true });
+    ok('ResistSwitch min-move', rs.result(0.1) === 0);
+    let outs = [];
+    for (let i = 0; i < 12; i++) outs.push(rs.result(0.5));
+    ok('ResistSwitch 持续同向出脉冲', outs.some(v => v !== 0), `outs=${outs.map(v => v.toFixed(2)).join(',')}`);
+    const veto = rs.result(-0.5); // 新方向单帧，历史不足
+    ok('ResistSwitch 反向单帧否决', veto === 0, `veto=${veto}`);
+  }
+
+  // 5. 线性拟合
+  {
+    const xs = [0, 1, 2, 3, 4], ys = xs.map(x => 2 * x + 3);
+    const f = fitLine(xs, ys);
+    ok('线性拟合 slope', near(f.slope, 2, 1e-12), `slope=${f.slope}`);
+    ok('线性拟合 intercept', near(f.intercept, 3, 1e-12), `intercept=${f.intercept}`);
+    ok('线性拟合 残差', near(f.rms, 0, 1e-12), `rms=${f.rms}`);
+  }
+
+  // 6. 漂移极轴斜率恢复
+  {
+    const vx = 0.08, vy = -0.03;
+    const ts = [], xs = [], ys = [];
+    for (let i = 0; i < 20; i++) { ts.push(i); xs.push(100 + vx * i); ys.push(80 + vy * i); }
+    const fx = fitLine(ts, xs), fy = fitLine(ts, ys);
+    ok('漂移极轴 Vx 恢复', near(fx.slope, vx, 1e-12), `vx=${fx.slope}`);
+    ok('漂移极轴 Vy 恢复', near(fy.slope, vy, 1e-12), `vy=${fy.slope}`);
+  }
+
+  // 7. 导星助手极轴误差公式
+  {
+    const rate = 0.12, dec = 15, scale = 3.8;
+    const pae = 3.8197 * Math.abs(rate) * scale / Math.cos(dec * RAD);
+    ok('GuidingAssistant PAE 公式', near(pae, 3.8197 * 0.12 * 3.8 / Math.cos(15 * RAD), 1e-9),
+      `PAE=${pae.toFixed(3)}'`);
+  }
+
+  // 8. 静态极轴 Alt/Az 分解自洽：纯 Alt 误差应只落到 Alt
+  {
+    // camAngle=0, HA=0 → harot = -90；若 CoR 在正上方 (dx=0, dy=-e)，hcorA=-90，hrot=0
+    const e = 100, camAngle = 0, ha = 0, scale = 3.8;
+    const dx = 0, dy = -e;
+    const hcorA = Math.atan2(dy, dx) * DEG;
+    const harot = norm(-camAngle - (90 + ha), 0, 360);
+    const hrot = norm(hcorA - harot, 0, 360);
+    const altR = Math.hypot(dx, dy) * Math.cos(hrot * RAD);
+    const azR = Math.hypot(dx, dy) * Math.sin(hrot * RAD);
+    ok('Alt/Az 分解 (纯 Alt)', near(Math.abs(altR), e, 1e-9) && near(azR, 0, 1e-9),
+      `alt=${altR.toFixed(3)} az=${azR.toFixed(3)}`);
+  }
+
+  const html = out.join('\n') + `\n\n${pass} passed, ${fail} failed`;
+  document.getElementById('selfOut').innerHTML = html;
+  return { pass, fail };
+}
+
+/* ============================================================
+   绑定 & 初始化
+   ============================================================ */
+const $ = id => document.getElementById(id);
+
+function bindTabs() {
+  document.querySelectorAll('#tabs button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#tabs button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('section.tab').forEach(s => s.classList.remove('active'));
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      // 切换后按新宽度重绘
+      requestAnimationFrame(() => {
+        if (btn.dataset.tab === 'guide') guide.render();
+        if (btn.dataset.tab === 'staticpa' && $('spaFit3').textContent !== '--') spa.run();
+        if (btn.dataset.tab === 'drift' && $('drRate').textContent !== '--') drift.run();
+        if (btn.dataset.tab === 'polardrift' && $('pdErr').textContent !== '--') polardrift.run();
+        if (btn.dataset.tab === 'assistant' && $('gaPae').textContent !== '--') assistant.run();
+      });
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  bindTabs();
+
+  guide.cfg = {
+    raDrift: 0.05, decDrift: 0.02, peAmp: 0.4, pePeriod: 480, exp: 2,
+    seeing: 0.12, minMove: 0.2, aggr: 0.7, hyst: 0.1, maxPulse: 5, gain: 0.9,
+  };
+  guide.reset();
+
+  $('gStart').addEventListener('click', () => guide.start());
+  $('gReset').addEventListener('click', () => { guide.stop(); guide.reset(); });
+  $('spaRun').addEventListener('click', () => spa.run());
+  $('drRun').addEventListener('click', () => drift.run());
+  $('pdRun').addEventListener('click', () => polardrift.run());
+  $('gaRun').addEventListener('click', () => assistant.run());
+  $('selfRun').addEventListener('click', () => runSelfTest());
+
+  // 初始渲染默认页
+  spa.run();
+  drift.run();
+  polardrift.run();
+  assistant.run();
+  runSelfTest();
+
+  window.addEventListener('resize', () => {
+    if ($('tab-guide').classList.contains('active')) guide.render();
+  });
+});
+</script>
+</body>
+</html>
