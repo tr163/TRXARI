@@ -3,7 +3,7 @@
 一加 Ace5（Termux + proot Ubuntu 24.04，无 root）独立跑 PHD2 2.6.14 导星：
 ZWO 导星相机走 USB OTG，赤道仪走 Wi-Fi LX200（TCP 4030，TR-Stepper）。
 
-**当前状态（2026-11-10）**
+**当前状态（2026-11-11）**
 
 | 项 | 状态 |
 |---|---|
@@ -12,6 +12,7 @@ ZWO 导星相机走 USB OTG，赤道仪走 Wi-Fi LX200（TCP 4030，TR-Stepper�
 | 赤道仪跟踪 / 脉冲导星（`:Te#` / `:Mgw#`） | ✅ 直连实测 |
 | PHD2 + Simulator 相机出图、Looping | ✅ |
 | 真相机（ZWO ASI）导星 / 校准 / 极轴 | ⬜ **缺相机，未验证** |
+| PHD2 算法 C++ 内核（M0，`core/`） | ✅ 6 种导星算法，40 项回归测试通过 |
 
 > 注意：之前看到的“导星成功”是 PHD2 内置 Simulator 的假象，不是真星点。
 
@@ -20,6 +21,8 @@ ZWO 导星相机走 USB OTG，赤道仪走 Wi-Fi LX200（TCP 4030，TR-Stepper�
 ```
 TRXARI/
 ├─ README.md                  ← 本文件（先看这个）
+├─ core/                      ← M0：PHD2 导星算法 C++17 内核 + 回归测试
+├─ prototype/                 ← 算法/前端验证页（自检 17/17）
 ├─ docs/
 │  ├─ HANDOFF-phd2.md         ← 完整交接说明（编译、安装、验证、踩坑）
 │  ├─ HANDOFF-phd2-build-original.md  ← 早期 PC 端构建版（历史参考）

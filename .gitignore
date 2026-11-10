@@ -5,6 +5,9 @@ artifacts/*.zip
 # 会话原始记录（20 MB JSONL，仅本地存档）
 docs/session-recovery/*.jsonl
 
+# C++ 构建目录
+core/build/
+
 # 调试残渣
 *.raw
 *.log
