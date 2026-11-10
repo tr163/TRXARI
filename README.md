@@ -16,6 +16,7 @@ ZWO 导星相机走 USB OTG，赤道仪走 Wi-Fi LX200（TCP 4030，TR-Stepper�
 | M0 可视化验收报告 | ✅ `python core/tools/make_report.py` → `core/build/guide-report.html` |
 | 星点检测（PHD2 `star.cpp`） | ✅ 20 项测试通过；`python core/tools/make_star_report.py` |
 | 帧级导星回放（星图→算法→修正） | ✅ 236 项检查通过；`python core/tools/make_replay_report.py` |
+| 校准数学 / 坐标变换 / 脉冲换算 | ✅ 10242 项检查通过（含 PHD2 TestTransforms 全角度） |
 
 > 注意：之前看到的“导星成功”是 PHD2 内置 Simulator 的假象，不是真星点。
 

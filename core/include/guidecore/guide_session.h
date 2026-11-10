@@ -12,6 +12,7 @@
 #pragma once
 
 #include "guidecore/algorithms.h"
+#include "guidecore/calibration.h"
 #include "guidecore/star.h"
 #include "guidecore/us_image.h"
 
@@ -28,6 +29,7 @@ struct GuideSessionParams
     AlgoParams decParams;
     Star::FindMode findMode = Star::FIND_CENTROID;
     bool raOnly = false; // PHD2 MyFrame::GuidingRAOnly()
+    MountTransform mount; // uncalibrated = camera coords pass through unchanged
 
     GuideSessionParams();
 };
@@ -40,7 +42,9 @@ struct GuideStep
     double x = 0., y = 0.; // measured star position
     double mass = 0., snr = 0., hfd = 0.;
     double raOffsetPx = 0., decOffsetPx = 0.;      // star - lock position (camera coords)
-    double raCorrectionPx = 0., decCorrectionPx = 0.; // guide algorithm output
+    double mountRaPx = 0., mountDecPx = 0.;          // PHD2 ofs.mountOfs
+    double raCorrectionPx = 0., decCorrectionPx = 0.; // guide algorithm output (mount coords when calibrated)
+    int raPulseMs = 0, decPulseMs = 0;               // PHD2 MoveOffset: signed pulse, 0 when uncalibrated
 };
 
 class GuideSession

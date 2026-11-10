@@ -208,8 +208,14 @@ WindowedAxisStats + Bessel/Butterworth 滤波器工厂，40 项回归测试通�
 `python core/tools/make_replay_report.py` 用 300 帧真实渲染的星图跑闭环（赤道仪
 1 帧延迟），展示残差、累计修正与 SNR/HFD；236 项检查通过。
 
+校准数学层也已移植：`calibration.{h,cpp}` 含 `Calibration` 结构、相机↔赤道仪
+坐标变换（含正交误差）、`MoveOffset` 的脉冲毫秒换算、赤纬补偿与子午线翻转、
+West/North 轴求解；10242 项检查通过，其中包含 PHD2 `TestTransforms()` 的
+全部正/反转角度组合。`GuideSession` 现在先做相机→赤道仪变换再把偏移送进算法，
+校准有效时同时给出有符号脉冲毫秒。
+
 **下一步**
 1. **M1 相机门**：搭最小 APK 验证 ZWO SDK（不可跳过）
-2. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）→ 校准数学与
-   相机坐标→赤道仪坐标变换 → NDK arm64 交叉编译
+2. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）→
+   交互式校准状态机（East/South 回中、回差清除）→ NDK arm64 交叉编译
 3. 两者都通过后再动 M2 及以后

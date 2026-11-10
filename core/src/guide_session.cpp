@@ -85,8 +85,23 @@ bool GuideSession::processFrame(const usImage& image, GuideStep& step)
     step.raOffsetPx = offset.X;
     step.decOffsetPx = m_params.raOnly ? 0.0 : offset.Y;
 
-    step.raCorrectionPx = m_ra->result(step.raOffsetPx);
-    step.decCorrectionPx = m_params.raOnly ? 0.0 : m_dec->result(step.decOffsetPx);
+    // PHD2 Mount::MoveOffset: TransformCameraCoordinatesToMountCoordinates()
+    // before the guide algorithms see the distance.
+    PHD_Point mountOffset;
+    const PHD_Point cameraOffset(step.raOffsetPx, step.decOffsetPx);
+    m_params.mount.cameraToMount(cameraOffset, mountOffset);
+    step.mountRaPx = mountOffset.X;
+    step.mountDecPx = m_params.raOnly ? 0.0 : mountOffset.Y;
+
+    step.raCorrectionPx = m_ra->result(step.mountRaPx);
+    step.decCorrectionPx = m_params.raOnly ? 0.0 : m_dec->result(step.mountDecPx);
+
+    if (m_params.mount.isCalibrated())
+    {
+        auto signedPulse = [](int ms, double distance) { return distance >= 0.0 ? ms : -ms; };
+        step.raPulseMs = signedPulse(m_params.mount.pulseMs(step.raCorrectionPx, true), step.raCorrectionPx);
+        step.decPulseMs = signedPulse(m_params.mount.pulseMs(step.decCorrectionPx, false), step.decCorrectionPx);
+    }
     return true;
 }
 
