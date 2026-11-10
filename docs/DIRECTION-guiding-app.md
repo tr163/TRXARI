@@ -202,8 +202,14 @@ WindowedAxisStats + Bessel/Butterworth 滤波器工厂，40 项回归测试通�
 20 项测试通过；`python core/tools/make_star_report.py` 生成合成星场验收页
 （检出位置/真值、主星放大质心、HFD、误差表）。
 
+帧级导星循环也已接通：`guide_session.{h,cpp}` 移植自
+`guider_multistar.cpp::UpdateCurrentPosition()` 的单星路径——首帧 `AutoFind` 锁星，
+之后每帧从上次位置 `Find`，`star - lockPos` 作为相机偏移送进 RA/DEC 导星算法。
+`python core/tools/make_replay_report.py` 用 300 帧真实渲染的星图跑闭环（赤道仪
+1 帧延迟），展示残差、累计修正与 SNR/HFD；236 项检查通过。
+
 **下一步**
 1. **M1 相机门**：搭最小 APK 验证 ZWO SDK（不可跳过）
-2. **M0 续**：星点/图像层（`star.cpp` + `usImage` + `image_math` 最小 shim）→
-   GuideLog 离线回放接口 → NDK arm64 交叉编译
+2. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）→ 校准数学与
+   相机坐标→赤道仪坐标变换 → NDK arm64 交叉编译
 3. 两者都通过后再动 M2 及以后
