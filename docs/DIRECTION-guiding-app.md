@@ -193,6 +193,8 @@ software/tr-mount-apk/
 **已完成（2026-11-11）**：M0 算法切片——`core/` 内 6 种导星算法 +
 WindowedAxisStats + Bessel/Butterworth 滤波器工厂，40 项回归测试通过
 （`cmake -S core -B core/build -G "MinGW Makefiles" && ctest --test-dir core/build`）。
+另有可视化验收：`python core/tools/make_report.py` 生成自包含 HTML，
+展示合成漂移下各算法的 RA/DEC 曲线、修正量与 RMS 对比。
 
 **下一步**
 1. **M1 相机门**：搭最小 APK 验证 ZWO SDK（不可跳过）

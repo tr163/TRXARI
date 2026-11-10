@@ -25,6 +25,19 @@ cmake --build core/build
 Linux/NDK 下把 generator 换掉即可。测试覆盖手算期望值，以及
 “完美响应赤道仪”闭环下残差收敛到 0。
 
+## 可视化验收
+
+```bash
+python core/tools/make_report.py
+```
+
+`guide_sim` 生成 600 帧合成导星曲线（周期误差 + 慢漂 + 视宁度噪声），
+让 6 种算法分别跑闭环（理想赤道仪、1 帧响应延迟），脚本把结果写成
+`core/build/guide-report.html`：RA/DEC 原始漂移与残差曲线、修正量、
+RMS 对比条图和汇总表。全部数字来自 C++ 内核，浏览器只负责绘图。
+
+> 当前范围仅算法内核闭环，不含星点检测/相机/赤道仪。
+
 ## 尚未移植
 
 - `StarDisplacement` 的导星脉冲/反转统计（算法用不到）

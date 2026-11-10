@@ -14,5 +14,8 @@ target_include_directories(guidecore PUBLIC include)
 add_executable(test_algorithms tests/test_algorithms.cpp)
 target_link_libraries(test_algorithms PRIVATE guidecore)
 
+add_executable(guide_sim tools/guide_sim.cpp)
+target_link_libraries(guide_sim PRIVATE guidecore)
+
 enable_testing()
 add_test(NAME algorithms COMMAND test_algorithms)
