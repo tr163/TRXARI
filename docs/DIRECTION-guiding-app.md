@@ -196,6 +196,12 @@ WindowedAxisStats + Bessel/Butterworth 滤波器工厂，40 项回归测试通�
 另有可视化验收：`python core/tools/make_report.py` 生成自包含 HTML，
 展示合成漂移下各算法的 RA/DEC 曲线、修正量与 RMS 对比。
 
+星点层（`star.cpp` + `usImage` + `Median3`）已移植：`Star::Find` 质心/HFD/SNR
+与 `GuideStar::AutoFind`（中值 → 降采样 → PSF 卷积 → 局部极大值 → 筛选）
+均为 PHD2 原流程，仅把 `pFrame/pCamera/pGuider` 换成 `AutoFindParams`。
+20 项测试通过；`python core/tools/make_star_report.py` 生成合成星场验收页
+（检出位置/真值、主星放大质心、HFD、误差表）。
+
 **下一步**
 1. **M1 相机门**：搭最小 APK 验证 ZWO SDK（不可跳过）
 2. **M0 续**：星点/图像层（`star.cpp` + `usImage` + `image_math` 最小 shim）→
