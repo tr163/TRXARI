@@ -220,6 +220,10 @@ West/North 轴求解；10242 项检查通过，其中包含 PHD2 `TestTransforms
 （`python core/tools/make_cal_report.py`）。整包 10273 项检查通过。
 尚未移植的是 parity（需要 RA/Dec 回读）和通知/告警 UI。
 
+导星回放已升级为完整链路：先跑校准，再用校准结果做相机→赤道仪变换、
+导星算法和 1 ms 量化的脉冲输出，合成赤道仪按脉冲移动星点并保留 1 帧延迟。
+`python core/tools/make_replay_report.py` 同时展示残差、累计修正和脉冲毫秒。
+
 **下一步**
 1. **M1 相机门**：搭最小 APK 验证 ZWO SDK（不可跳过）
 2. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）→ NDK arm64 交叉编译

@@ -50,10 +50,11 @@ RMS 对比条图和汇总表。全部数字来自 C++ 内核，浏览器只负�
 python core/tools/make_replay_report.py
 ```
 
-`guide_replay` 每帧渲染 121×121 星图（背景 + 噪声 + 高斯 PSF），先用
-`AutoFind` 锁星，再逐帧调用与 PHD2 相同的 `Star::Find(searchRegion, 上次位置)`，
-把 `star - lockPos` 交给导星算法；赤道仪按 1 帧延迟应用修正。页面显示残差曲线、
-累计漂移 vs 累计修正、修正量、SNR/HFD，以及 6 种算法的 RMS 汇总。
+`guide_replay` 先用 `CalibrationSession` 在合成赤道仪上跑完整校准，得到
+xAngle/yAngle/xRate/yRate；之后每帧渲染 121×121 星图（背景 + 噪声 + 高斯 PSF），
+`AutoFind` 锁星 → 逐帧 `Star::Find(searchRegion, 上次位置)` → 相机→赤道仪变换 →
+导星算法 → 有符号脉冲毫秒（1 ms 量化）→ 合成赤道仪（1 帧延迟）。页面显示残差、
+累计漂移 vs 实际修正、脉冲毫秒、SNR/HFD，以及 6 种算法的 RMS/脉冲汇总。
 
 校准状态机验收页：
 

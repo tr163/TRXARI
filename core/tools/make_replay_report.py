@@ -37,7 +37,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GuideCore M0 · 帧级导星回放验收</title>
+<title>GuideCore M0 · 校准到脉冲的导星闭环验收</title>
 <style>
   :root{--bg:#0f1419;--panel:#161d24;--line:#2a3441;--text:#c9d1d9;--dim:#8b949e;
         --ra:#58a6ff;--dec:#f0883e;--drift:#8b949e;--corr:#3fb950;--bad:#f85149}
@@ -68,9 +68,10 @@ TEMPLATE = r"""<!DOCTYPE html>
 </head>
 <body>
 <header>
-  <h1>GuideCore M0 · 帧级导星回放验收</h1>
-  <div class="sub">每一帧都是真实渲染的 121×121 星图：<code>GuideStar::AutoFind</code> 选星 → 逐帧 <code>Star::Find</code> 重找 →
-    <code>star - lockPos</code> 偏移 → PHD2 导星算法输出修正。赤道仪模型为理想响应 + 1 帧延迟。</div>
+  <h1>GuideCore M0 · 校准到脉冲的导星闭环验收</h1>
+  <div class="sub">先用移植的校准状态机测出 xAngle / yAngle / xRate / yRate，再逐帧渲染 121×121 星图：
+    <code>AutoFind</code> 选星 → <code>Star::Find</code> 重找 → 相机→赤道仪坐标变换 → PHD2 导星算法 →
+    脉冲毫秒（1 ms 量化）→ 合成赤道仪（1 帧延迟）。</div>
 </header>
 
 <div class="bar">
@@ -80,7 +81,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   <div class="chip"><span>丢星帧</span><b id="cLost"></b></div>
   <div class="chip"><span>残差 RMS (RA)</span><b id="cRA"></b></div>
   <div class="chip"><span>残差 RMS (DEC)</span><b id="cDEC"></b></div>
-  <div class="chip"><span>峰值 (RA)</span><b id="cPeak"></b></div>
+  <div class="chip"><span>平均脉冲</span><b id="cPulseAvg"></b></div>
+  <div class="chip"><span>xAngle / yAngle</span><b id="cAngles"></b></div>
+  <div class="chip"><span>SNR / HFD（末帧）</span><b id="cStar"></b></div>
 </div>
 
 <main>
@@ -95,22 +98,20 @@ TEMPLATE = r"""<!DOCTYPE html>
   </section>
 
   <section class="panel">
-    <h2>累计原始漂移 vs 累计修正（像素）</h2>
+    <h2>累计原始漂移 vs 累计实际修正（相机像素）</h2>
     <canvas id="cCum" width="960" height="260"></canvas>
     <div class="legend">
       <span><i style="background:var(--drift)"></i>原始漂移 RA / DEC</span>
-      <span><i style="background:var(--corr)"></i>累计修正 RA / DEC</span>
+      <span><i style="background:var(--corr)"></i>脉冲累计后的实际修正 RA / DEC</span>
     </div>
   </section>
 
   <section class="panel">
-    <h2>每帧修正量（像素） · 星点 SNR / HFD（已归一化到修正量刻度）</h2>
-    <canvas id="cCorr" width="960" height="260"></canvas>
+    <h2>送往赤道仪的脉冲（毫秒，1 ms 量化）</h2>
+    <canvas id="cPulse" width="960" height="260"></canvas>
     <div class="legend">
-      <span><i style="background:var(--ra)"></i>RA 修正</span>
-      <span><i style="background:var(--dec)"></i>DEC 修正</span>
-      <span><i style="background:var(--corr)"></i>SNR</span>
-      <span><i style="background:var(--bad)"></i>HFD</span>
+      <span><i style="background:var(--ra)"></i>RA 脉冲</span>
+      <span><i style="background:var(--dec)"></i>DEC 脉冲</span>
     </div>
   </section>
 
@@ -118,7 +119,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     <h2>算法汇总（settle 后）</h2>
     <table>
       <thead><tr><th>算法</th><th>RMS RA</th><th>RMS DEC</th><th>峰值 RA</th><th>峰值 DEC</th>
-        <th>质心误差</th><th>丢星帧</th></tr></thead>
+        <th>平均脉冲</th><th>最大脉冲</th><th>质心误差</th><th>丢星帧</th></tr></thead>
       <tbody id="tbody"></tbody>
     </table>
   </section>
@@ -127,6 +128,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <div class="note">
   合成星图：背景 800 ADU + σ=6 噪声，高斯星 σ=1.6 px / 峰值 12000 ADU，SNR≈300，HFD≈3.8 px。
   漂移：RA 0.12 px/帧 + 0.9 px 周期误差；DEC 0.04 px/帧 + 0.45 px 周期误差。
+  校准：RA 轴在相机中 0.4 rad、DEC 轴偏离正交 0.05 rad，导星速率 0.02 px/ms，校准结果直接用于坐标变换与脉冲换算。
   参数取 PHD2 默认（minMove=0.2、searchRegion=15、MinHFD=1.5、MaxHFD=20）。所有数字来自 C++ 内核，浏览器只绘图。
 </div>
 
@@ -195,20 +197,22 @@ function lineChart(cv, series, opts) {
   }
 }
 
-function cumulative(a, scale) {
-  let s = 0;
-  return a.map(v => (s += v * scale));
-}
+const deg = r => (r * 180 / Math.PI).toFixed(1) + '°';
 
 let current = 0;
 function render() {
   const a = D.algorithms[current];
+  const cal = D.calibration;
   document.getElementById('cFrames').textContent = D.frames;
   document.getElementById('cErr').textContent = a.meanErr.toFixed(4) + ' px';
   document.getElementById('cLost').textContent = a.lost;
   document.getElementById('cRA').textContent = a.rmsRA.toFixed(3) + ' px';
   document.getElementById('cDEC').textContent = a.rmsDec.toFixed(3) + ' px';
-  document.getElementById('cPeak').textContent = a.peakRA.toFixed(3) + ' px';
+  document.getElementById('cPulseAvg').textContent = a.meanPulseMs.toFixed(1) + ' ms';
+  document.getElementById('cAngles').textContent = `${deg(cal.xAngle)} / ${deg(cal.yAngle)}`;
+  const last = D.frames - 1;
+  document.getElementById('cStar').textContent =
+    `${a.snr[last].toFixed(0)} / ${a.hfd[last].toFixed(2)} px`;
 
   lineChart(document.getElementById('cRes'), [
     {values: a.resRA, color: C.ra},
@@ -220,28 +224,20 @@ function render() {
   lineChart(document.getElementById('cCum'), [
     {values: rawRA, color: C.drift, dash: [5, 4], width: 1.2},
     {values: rawDec, color: C.drift, dash: [2, 3], width: 1.2},
-    {values: cumulative(a.corrRA, 1), color: C.ra, width: 1.8},
-    {values: cumulative(a.corrDec, 1), color: C.dec, width: 1.8},
+    {values: a.appCamRA, color: C.ra, width: 1.8},
+    {values: a.appCamDec, color: C.dec, width: 1.8},
   ], {zero: true});
 
-  // corrections on the left scale, SNR/HFD normalized onto the same panel
-  const maxCorr = Math.max(0.1, ...a.corrRA.map(Math.abs), ...a.corrDec.map(Math.abs));
-  let snrMax = 0, hfdMax = 0;
-  for (const v of a.snr) snrMax = Math.max(snrMax, v);
-  for (const v of a.hfd) hfdMax = Math.max(hfdMax, v);
-  const snrScaled = a.snr.map(v => v / (snrMax || 1) * maxCorr);
-  const hfdScaled = a.hfd.map(v => v / (hfdMax || 1) * maxCorr);
-  lineChart(document.getElementById('cCorr'), [
-    {values: a.corrRA, color: C.ra},
-    {values: a.corrDec, color: C.dec},
-    {values: snrScaled, color: C.corr, dash: [3, 3]},
-    {values: hfdScaled, color: C.bad, dash: [1, 3]},
-  ]);
+  lineChart(document.getElementById('cPulse'), [
+    {values: a.pulseRA, color: C.ra},
+    {values: a.pulseDec, color: C.dec},
+  ], {zero: true});
 
   document.getElementById('tbody').innerHTML = D.algorithms.map((x, i) => `<tr class="${i === current ? 'sel' : ''}">
       <td>${x.name}</td>
       <td>${x.rmsRA.toFixed(3)}</td><td>${x.rmsDec.toFixed(3)}</td>
       <td>${x.peakRA.toFixed(3)}</td><td>${x.peakDec.toFixed(3)}</td>
+      <td>${x.meanPulseMs.toFixed(1)} ms</td><td>${x.maxPulseMs.toFixed(1)} ms</td>
       <td>${x.meanErr.toFixed(4)}</td><td>${x.lost}</td>
     </tr>`).join('');
 }
