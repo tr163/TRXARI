@@ -57,3 +57,14 @@ PHD2 里相机选 **ZWO ASI Camera**、赤道仪选 **INDI Mount**（localhost:7
 3. `proot-distro login` 是 `env -i`，`TERMUX_USB_FD` 要走 `$TMPDIR/usbfd` 中转。
 
 细节全在 `docs/HANDOFF-phd2.md`。
+
+## 仓库
+
+私有仓库：<https://github.com/tr163/TRXARI>
+
+本地不跟踪（见 `.gitignore`）：
+
+- `artifacts/phd2-arm64.tar.gz`（45 MB 编译产物，可用 `pc-build/` 重建）
+- `docs/session-recovery/*.jsonl`（20 MB 会话原始记录，仅本地）
+
+脚本行尾由 `.gitattributes` 强制为 LF，避免 Windows 上 checkout 后到 Linux 不能跑。
