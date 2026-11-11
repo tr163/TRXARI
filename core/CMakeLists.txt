@@ -19,6 +19,8 @@ add_library(guidecore ${GUIDECORE_LIB_TYPE}
     src/star.cpp
     src/guide_session.cpp
     src/calibration.cpp
+    src/sim_drivers.cpp
+    src/engine.cpp
 )
 target_include_directories(guidecore PUBLIC include)
 
@@ -37,6 +39,9 @@ target_link_libraries(test_guide_session PRIVATE guidecore)
 
 add_executable(test_calibration tests/test_calibration.cpp)
 target_link_libraries(test_calibration PRIVATE guidecore)
+
+add_executable(test_engine tests/test_engine.cpp)
+target_link_libraries(test_engine PRIVATE guidecore)
 
 add_executable(guide_sim tools/guide_sim.cpp)
 target_link_libraries(guide_sim PRIVATE guidecore)
@@ -58,3 +63,4 @@ add_test(NAME algorithms COMMAND test_algorithms)
 add_test(NAME star COMMAND test_star)
 add_test(NAME guide_session COMMAND test_guide_session)
 add_test(NAME calibration COMMAND test_calibration)
+add_test(NAME engine COMMAND test_engine)
