@@ -446,7 +446,8 @@ public:
             "{\"state\":\"%s\",\"frame\":%d,"
             "\"star\":{\"valid\":%s,\"snr\":%.2f,\"hfd\":%.2f,\"dx\":%.3f,\"dy\":%.3f},"
             "\"guide\":{\"samples\":%d,\"rmsRa\":%.3f,\"rmsDec\":%.3f,\"rmsTotal\":%.3f,"
-            "\"peak\":%.3f,\"lastRaMs\":%d,\"lastDecMs\":%d,\"meanPulseMs\":%d},"
+            "\"peak\":%.3f,\"lastRaPx\":%.3f,\"lastDecPx\":%.3f,"
+            "\"lastRaMs\":%d,\"lastDecMs\":%d,\"meanPulseMs\":%d},"
             "\"calibration\":{\"valid\":%s,\"step\":\"%s\",\"angleDeg\":%.3f,"
             "\"raRate\":%.6f,\"decRate\":%.6f,\"orthoError\":%.3f},"
             "\"mount\":{\"tracking\":%s,\"slewRate\":%d,\"raDeg\":%.3f,\"decDeg\":%.3f},"
@@ -454,8 +455,9 @@ public:
             "\"aggression\":%.0f,\"hysteresis\":%.0f,\"guideRate\":%.2f},"
             "\"engine\":{\"coreVersion\":\"%s\"},\"previewW\":%d,\"previewH\":%d}",
             StateName(m_state), m_frame, m_starValid ? "true" : "false", m_snr, m_hfd, m_dx, m_dy,
-            (int) m_winRa.size(), Rms(m_winRa), Rms(m_winDec), rmsTotal, peak, m_lastRaMs, m_lastDecMs,
-            MeanPulse(), m_calValid ? "true" : "false", CalStepName(CalStep()), cal.xAngle * 180.0 / kPi,
+            (int) m_winRa.size(), Rms(m_winRa), Rms(m_winDec), rmsTotal, peak, m_lastRaPx, m_lastDecPx,
+            m_lastRaMs, m_lastDecMs, MeanPulse(), m_calValid ? "true" : "false", CalStepName(CalStep()),
+            cal.xAngle * 180.0 / kPi,
             cal.xRate, cal.yRate, ortho, m_sim.tracking() ? "true" : "false", m_sim.slewRate(),
             m_sim.raDeg(), m_sim.decDeg(), AlgoName(m_raAlgo), AlgoName(m_decAlgo), m_raParams.minMove,
             m_raParams.aggression * 100.0, m_raParams.hysteresis * 100.0, m_guideRate, kCoreVersion,
@@ -494,6 +496,7 @@ private:
         m_winDec.clear();
         m_winPulse.clear();
         m_lastRaMs = m_lastDecMs = 0;
+        m_lastRaPx = m_lastDecPx = 0.0;
         m_dx = m_dy = 0.0;
         m_snr = m_hfd = 0.0;
     }
@@ -587,6 +590,8 @@ private:
         s.samples = (int) m_winRa.size();
         s.lastRaMs = m_lastRaMs;
         s.lastDecMs = m_lastDecMs;
+        s.lastRaPx = m_lastRaPx;
+        s.lastDecPx = m_lastDecPx;
         s.meanPulseMs = MeanPulse();
         s.snr = m_snr;
         s.hfd = m_hfd;
@@ -710,6 +715,8 @@ private:
         m_dy = step.decOffsetPx;
         m_lastRaMs = step.raPulseMs;
         m_lastDecMs = step.decPulseMs;
+        m_lastRaPx = step.mountRaPx;
+        m_lastDecPx = step.mountDecPx;
 
         if (m_transform.isCalibrated())
         {
@@ -808,6 +815,7 @@ private:
     bool m_starValid = false;
     double m_snr = 0.0, m_hfd = 0.0, m_dx = 0.0, m_dy = 0.0;
     int m_lastRaMs = 0, m_lastDecMs = 0;
+    double m_lastRaPx = 0.0, m_lastDecPx = 0.0;
     std::deque<double> m_winRa, m_winDec, m_winPulse;
 
     gc::AlgoType m_raAlgo = gc::AlgoType::Hysteresis;

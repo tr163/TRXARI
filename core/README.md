@@ -29,7 +29,8 @@ ctest --test-dir core/build --output-on-failure
 
 Linux 下把 generator 换掉即可。测试覆盖：算法手算期望值、完美赤道仪闭环
 （40 项）、星点检测（20 项）、帧级导星循环（236 项）、校准数学与状态机
-（10273 项，含 PHD2 `TestTransforms()` 的全部角度组合和一次完整四方向校准）。
+（10273 项，含 PHD2 `TestTransforms()` 的全部角度组合和一次完整四方向校准）、
+模拟引擎闭环（校准 + 60 帧导星，RMS < 0.5 px）。`ctest` 共 5 项全绿。
 
 Android arm64 共享库（NDK r27c，本机路径 `D:/tools/android/android-ndk-r27c`）：
 
@@ -42,6 +43,26 @@ cmake --build core/build/android
 ```
 
 Android 构建只产出库，测试和仿真工具自动跳过。
+
+## 模拟引擎（APK 桥）
+
+`engine.h` / `engine.cpp` + `sim_drivers.{h,cpp}` 把现有 `GuideSession` /
+`CalibrationSession` 封装成可线程运行的 C API（`gc_engine_*`），内部用
+`SimCamera` 合成 640×480 星场、`SimMount` 积分漂移与脉冲。APK 只通过
+`get_status`（JSON）和 `get_preview`（8-bit 灰度）消费，JNI 不做回调。
+
+```c
+gc_engine_create(configJson);     // exposureMs / seed / jitterPx / 漂移率
+gc_engine_start_loop();
+gc_engine_start_calibration();
+gc_engine_start_guide();          // 校准无效时返回 -3
+gc_engine_step();                 // 宿主测试同步推进一帧
+gc_engine_get_status(buf, cap);   // 返回所需长度
+gc_engine_get_preview(buf, cap);
+```
+
+闭环测试 `tests/test_engine.cpp` 走完校准 → 导星 60 帧，断言 RMS < 0.5 px
+且脉冲非零。默认模拟漂移按 1 s 曝光调为 RA 0.25 px/s、DEC 0.08 px/s。
 
 ## 可视化验收
 

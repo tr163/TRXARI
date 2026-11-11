@@ -359,7 +359,7 @@ int32_t gc_engine_get_preview(uint8_t *out, int32_t cap);
 
 ### 7.4 Android 集成
 
-- 新增 `GuideBridgePlugin.kt`（`@CapacitorPlugin(name = "GuideBridge")`），方法：
+- 新增 `GuideBridgePlugin`（`@CapacitorPlugin(name = "GuideBridge")`；沿用项目现有的 Java，不额外引入 Kotlin 工具链），方法：
   `startLoop/stopLoop/startCalibration/startGuiding/stop/clearCalibration/setParams/setTracking/setSlewRate/manualMove/home/getStatus/getPreview/destroy`。
 - 新增 `libguide_bridge.so`：TR-Stepper 内的 JNI 薄层，编译时链接 `libguidecore.so`。
   源文件放在 `android/app/src/main/cpp/`，Kotlin 放在

@@ -37,6 +37,8 @@ typedef struct GcEngineStats
     int32_t samples;
     int32_t lastRaMs;
     int32_t lastDecMs;
+    double lastRaPx;
+    double lastDecPx;
     int32_t meanPulseMs;
     double snr;
     double hfd;
