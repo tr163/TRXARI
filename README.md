@@ -20,6 +20,7 @@ ZWO 导星相机走 USB OTG，赤道仪走 Wi-Fi LX200（TCP 4030，TR-Stepper�
 | 校准状态机（四方向 + 回差 + 回中） | ✅ 合成赤道仪完整跑通；`python core/tools/make_cal_report.py` |
 | 交互式导星模拟（浏览器控制） | ✅ `python core/tools/guide_live_server.py` → <http://127.0.0.1:8765> |
 | NDK arm64 交叉编译（`libguidecore.so`） | ✅ NDK r27c / Clang 18，ELF64 AArch64，`core/build/android/` |
+| NINA 风格导星 APK 首版设计（全模拟） | ✅ 设计定稿，见 `docs/superpowers/specs/2026-11-11-nina-style-guiding-apk-design.md` |
 
 > 注意：之前看到的“导星成功”是 PHD2 内置 Simulator 的假象，不是真星点。
 

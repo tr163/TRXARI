@@ -236,7 +236,13 @@ NDK 交叉编译已接通：`core/` 在 Android 构建下输出共享库
 主机测试与仿真工具在 Android 构建下自动跳过。命令见 `core/README.md`。
 算法内核到 APK 的剩余缺口只有 JNI/`gc_*` C 接口与相机、赤道仪驱动。
 
+**前端设计（2026-11-11）**：NINA 风格的横屏导星 APK 首版设计已定稿，
+覆盖全局侧栏、主页导星面板、可折叠扇形手控、设备参数、赤道仪页与导星页
+（px/″ 切换、算法参数、校准向导）。首版用 SimCamera + SimMount 全模拟闭环，
+不验证 M1。设计稿见 `docs/superpowers/specs/2026-11-11-nina-style-guiding-apk-design.md`。
+
 **下一步**
-1. **M1 相机门**：搭最小 APK 验证 ZWO SDK（不可跳过）
-2. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）
+1. **前端首版**：按设计稿在 TR-Stepper APK 落地，跑通模拟闭环
+2. **M1 相机门**：搭最小 APK 验证 ZWO SDK（不可跳过）
+3. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）
 3. M1 之后补 `gc_*` C 接口 + JNI，再动 M2 及以后
