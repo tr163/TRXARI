@@ -27,9 +27,21 @@ cmake --build core/build
 ctest --test-dir core/build --output-on-failure
 ```
 
-Linux/NDK 下把 generator 换掉即可。测试覆盖：算法手算期望值、完美赤道仪闭环
+Linux 下把 generator 换掉即可。测试覆盖：算法手算期望值、完美赤道仪闭环
 （40 项）、星点检测（20 项）、帧级导星循环（236 项）、校准数学与状态机
 （10273 项，含 PHD2 `TestTransforms()` 的全部角度组合和一次完整四方向校准）。
+
+Android arm64 共享库（NDK r27c，本机路径 `D:/tools/android/android-ndk-r27c`）：
+
+```bash
+cmake -S core -B core/build/android -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=D:/tools/android/android-ndk-r27c/build/cmake/android.toolchain.cmake \
+  -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-24 -DCMAKE_BUILD_TYPE=Release
+cmake --build core/build/android
+# → core/build/android/libguidecore.so (ELF64 AArch64)
+```
+
+Android 构建只产出库，测试和仿真工具自动跳过。
 
 ## 可视化验收
 

@@ -231,7 +231,12 @@ West/North 轴求解；10242 项检查通过，其中包含 PHD2 `TestTransforms
 `CalibrationSession` 接上输入输出，没有新增算法逻辑，M1 之后可以原样换成
 相机帧源和 `:Mg` 脉冲输出。
 
+NDK 交叉编译已接通：`core/` 在 Android 构建下输出共享库
+（`arm64-v8a libguidecore.so`，NDK r27c / Clang 18，ELF64 AArch64），
+主机测试与仿真工具在 Android 构建下自动跳过。命令见 `core/README.md`。
+算法内核到 APK 的剩余缺口只有 JNI/`gc_*` C 接口与相机、赤道仪驱动。
+
 **下一步**
 1. **M1 相机门**：搭最小 APK 验证 ZWO SDK（不可跳过）
-2. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）→ NDK arm64 交叉编译
-3. 两者都通过后再动 M2 及以后
+2. **M0 续**：接真实帧序列/GuideLog 回放（帧接口已就绪）
+3. M1 之后补 `gc_*` C 接口 + JNI，再动 M2 及以后

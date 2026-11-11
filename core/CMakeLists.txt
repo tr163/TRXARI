@@ -5,7 +5,14 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(guidecore STATIC
+# NDK builds the arm64 .so; tests and simulation tools stay host-only.
+if(ANDROID)
+    set(GUIDECORE_LIB_TYPE SHARED)
+else()
+    set(GUIDECORE_LIB_TYPE STATIC)
+endif()
+
+add_library(guidecore ${GUIDECORE_LIB_TYPE}
     src/axis_stats.cpp
     src/algorithms.cpp
     src/us_image.cpp
@@ -14,6 +21,10 @@ add_library(guidecore STATIC
     src/calibration.cpp
 )
 target_include_directories(guidecore PUBLIC include)
+
+if(ANDROID)
+    return()
+endif()
 
 add_executable(test_algorithms tests/test_algorithms.cpp)
 target_link_libraries(test_algorithms PRIVATE guidecore)
