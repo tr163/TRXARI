@@ -71,7 +71,7 @@ PHD2 里相机选 **ZWO ASI Camera**、赤道仪选 **INDI Mount**（localhost:7
 
 ## 仓库
 
-私有仓库：<https://github.com/tr163/TRXARI>
+公开仓库：<https://github.com/tr163/TRXARI>
 
 本地不跟踪（见 `.gitignore`）：
 
@@ -79,3 +79,10 @@ PHD2 里相机选 **ZWO ASI Camera**、赤道仪选 **INDI Mount**（localhost:7
 - `docs/session-recovery/*.jsonl`（20 MB 会话原始记录，仅本地）
 
 脚本行尾由 `.gitattributes` 强制为 LF，避免 Windows 上 checkout 后到 Linux 不能跑。
+
+## 许可证
+
+本项目以 **GPL-3.0** 发布，见 [LICENSE](LICENSE)。
+
+`core/`、`prototype/` 中移植自 PHD2 v2.6.14 的代码遵循 **BSD-3-Clause**，
+详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
